@@ -555,4 +555,360 @@
       
       whiteEl.classList.toggle('warning', whiteTime <= 30 && whiteTime > 0);
       blackEl.classList.toggle('warning', blackTime <= 30 && blackTime > 0);
-      whiteEl.classList.toggle('paused', currentPlayer​​​​​​​​​​​​​​​​
+      whiteEl.classList.toggle('paused', currentPlayer !== 'white' || winner);
+      blackEl.classList.toggle('paused', currentPlayer !== 'black' || winner);
+      
+      // Move timer
+      const whiteMoveEl = document.getElementById('white-move-timer');
+      const blackMoveEl = document.getElementById('black-move-timer');
+      
+      if (moveTime > 0 && !winner) {
+        if (currentPlayer === 'white') {
+          whiteMoveEl.textContent = currentMoveTime + 's';
+          whiteMoveEl.classList.toggle('warning', currentMoveTime <= 5);
+          blackMoveEl.textContent = '';
+        } else {
+          blackMoveEl.textContent = currentMoveTime + 's';
+          blackMoveEl.classList.toggle('warning', currentMoveTime <= 5);
+          whiteMoveEl.textContent = '';
+        }
+      } else {
+        whiteMoveEl.textContent = '';
+        blackMoveEl.textContent = '';
+      }
+    }
+    
+    function startTimers() {
+      pauseTimers();
+      if (gameTime > 0) {
+        timerInterval = setInterval(() => {
+          if (winner) return;
+          if (currentPlayer === 'white') {
+            whiteTime--;
+            if (whiteTime <= 0) {
+              whiteTime = 0;
+              winner = 'black';
+              render();
+            }
+          } else {
+            blackTime--;
+            if (blackTime <= 0) {
+              blackTime = 0;
+              winner = 'white';
+              render();
+            }
+          }
+          updateTimerDisplay();
+        }, 1000);
+      }
+      startMoveTimer();
+    }
+    
+    function startMoveTimer() {
+      clearInterval(moveTimerInterval);
+      if (moveTime > 0) {
+        currentMoveTime = moveTime;
+        moveTimerInterval = setInterval(() => {
+          if (winner) return;
+          currentMoveTime--;
+          if (currentMoveTime <= 0) {
+            // Czas na ruch minął - zmiana gracza
+            currentMoveTime = moveTime;
+            currentPlayer = currentPlayer === 'white' ? 'black' : 'white';
+            selected = null;
+            validMoves = [];
+            chainCapture = null;
+            mustCapture = getAllCaptures(board, currentPlayer);
+            render();
+          }
+          updateTimerDisplay();
+        }, 1000);
+      }
+    }
+    
+    function pauseTimers() {
+      clearInterval(timerInterval);
+      clearInterval(moveTimerInterval);
+    }
+    
+    function resumeTimers() {
+      startTimers();
+    }
+
+    function toggleForceCapture() {
+      forceCapture = document.getElementById('force-capture').checked;
+      resetGame();
+    }
+
+    function init() {
+      board = Array(SIZE).fill(null).map(() => Array(SIZE).fill(null));
+      for (let r = 0; r < SIZE; r++) {
+        for (let c = 0; c < SIZE; c++) {
+          if ((r + c) % 2 === 1) {
+            if (r < 2) board[r][c] = { player: 'black', king: false };
+            else if (r > 5) board[r][c] = { player: 'white', king: false };
+          }
+        }
+      }
+      selected = null;
+      currentPlayer = 'white';
+      validMoves = [];
+      mustCapture = [];
+      winner = null;
+      chainCapture = null;
+    }
+
+    function isValid(r, c) { return r >= 0 && r < SIZE && c >= 0 && c < SIZE; }
+
+    function getCaptures(b, row, col, piece) {
+      const caps = [];
+      const dirs = [[-1,-1],[-1,1],[1,-1],[1,1]];
+      const opp = piece.player === 'white' ? 'black' : 'white';
+
+      if (piece.king) {
+        for (const [dr, dc] of dirs) {
+          let r = row + dr, c = col + dc;
+          while (isValid(r, c) && !b[r][c]) { r += dr; c += dc; }
+          if (isValid(r, c) && b[r][c]?.player === opp) {
+            const cr = r, cc = c;
+            r += dr; c += dc;
+            while (isValid(r, c) && !b[r][c]) {
+              caps.push({ toRow: r, toCol: c, capRow: cr, capCol: cc });
+              r += dr; c += dc;
+            }
+          }
+        }
+      } else {
+        for (const [dr, dc] of dirs) {
+          const mr = row + dr, mc = col + dc;
+          const tr = row + 2*dr, tc = col + 2*dc;
+          if (isValid(tr, tc) && b[mr][mc]?.player === opp && !b[tr][tc]) {
+            caps.push({ toRow: tr, toCol: tc, capRow: mr, capCol: mc });
+          }
+        }
+      }
+      return caps;
+    }
+
+    function getMoves(b, row, col, piece) {
+      const moves = [];
+      const dirs = piece.king ? [[-1,-1],[-1,1],[1,-1],[1,1]] :
+                   piece.player === 'white' ? [[-1,-1],[-1,1]] : [[1,-1],[1,1]];
+
+      if (piece.king) {
+        for (const [dr, dc] of dirs) {
+          let r = row + dr, c = col + dc;
+          while (isValid(r, c) && !b[r][c]) {
+            moves.push({ toRow: r, toCol: c });
+            r += dr; c += dc;
+          }
+        }
+      } else {
+        for (const [dr, dc] of dirs) {
+          const tr = row + dr, tc = col + dc;
+          if (isValid(tr, tc) && !b[tr][tc]) moves.push({ toRow: tr, toCol: tc });
+        }
+      }
+      return moves;
+    }
+
+    function getAllCaptures(b, player) {
+      const all = [];
+      for (let r = 0; r < SIZE; r++) {
+        for (let c = 0; c < SIZE; c++) {
+          if (b[r][c]?.player === player) {
+            const caps = getCaptures(b, r, c, b[r][c]);
+            if (caps.length > 0) all.push({ row: r, col: c, captures: caps });
+          }
+        }
+      }
+      return all;
+    }
+
+    function checkWinner(b, next) {
+      let hw = false, hb = false;
+      for (let r = 0; r < SIZE; r++) {
+        for (let c = 0; c < SIZE; c++) {
+          if (b[r][c]?.player === 'white') hw = true;
+          if (b[r][c]?.player === 'black') hb = true;
+        }
+      }
+      if (!hw) return 'black';
+      if (!hb) return 'white';
+
+      if (getAllCaptures(b, next).length > 0) return null;
+      for (let r = 0; r < SIZE; r++) {
+        for (let c = 0; c < SIZE; c++) {
+          if (b[r][c]?.player === next && getMoves(b, r, c, b[r][c]).length > 0) return null;
+        }
+      }
+      return next === 'white' ? 'black' : 'white';
+    }
+
+    function countPieces(player) {
+      let n = 0;
+      for (let r = 0; r < SIZE; r++)
+        for (let c = 0; c < SIZE; c++)
+          if (board[r][c]?.player === player) n++;
+      return n;
+    }
+
+    function handleClick(row, col) {
+      if (winner || isPaused) return;
+
+      const piece = board[row][col];
+
+      if (chainCapture) {
+        if (row === chainCapture.row && col === chainCapture.col) return;
+        const move = validMoves.find(m => m.toRow === row && m.toCol === col);
+        if (move) executeMove(chainCapture.row, chainCapture.col, move);
+        return;
+      }
+
+      if (selected && selected.row === row && selected.col === col) {
+        selected = null;
+        validMoves = [];
+        render();
+        return;
+      }
+
+      if (selected) {
+        const move = validMoves.find(m => m.toRow === row && m.toCol === col);
+        if (move) { executeMove(selected.row, selected.col, move); return; }
+      }
+
+      if (piece && piece.player === currentPlayer) {
+        if (forceCapture && mustCapture.length > 0) {
+          const can = mustCapture.find(c => c.row === row && c.col === col);
+          if (!can) return;
+          selected = { row, col };
+          validMoves = can.captures;
+        } else {
+          const caps = getCaptures(board, row, col, piece);
+          validMoves = caps.length > 0 ? caps : getMoves(board, row, col, piece);
+          if (!forceCapture) {
+            const moves = getMoves(board, row, col, piece);
+            validMoves = [...caps, ...moves];
+          }
+          selected = { row, col };
+        }
+        render();
+      }
+    }
+
+    function executeMove(fromRow, fromCol, move) {
+      const piece = { ...board[fromRow][fromCol] };
+      board[fromRow][fromCol] = null;
+      board[move.toRow][move.toCol] = piece;
+
+      if ((piece.player === 'white' && move.toRow === 0) ||
+          (piece.player === 'black' && move.toRow === SIZE - 1)) {
+        piece.king = true;
+        board[move.toRow][move.toCol] = piece;
+      }
+
+      if (move.capRow !== undefined) {
+        board[move.capRow][move.capCol] = null;
+        if (forceCapture) {
+          const more = getCaptures(board, move.toRow, move.toCol, piece);
+          if (more.length > 0) {
+            selected = null;
+            validMoves = more;
+            chainCapture = { row: move.toRow, col: move.toCol };
+            render();
+            return;
+          }
+        }
+      }
+
+      const next = currentPlayer === 'white' ? 'black' : 'white';
+      currentPlayer = next;
+      mustCapture = getAllCaptures(board, next);
+      selected = null;
+      validMoves = [];
+      chainCapture = null;
+      winner = checkWinner(board, next);
+      if (winner) pauseTimers();
+      if (moveTime > 0 && !winner) {
+        currentMoveTime = moveTime;
+        startMoveTimer();
+      }
+      render();
+    }
+
+    function resetGame() {
+      init();
+      isPaused = false;
+      document.getElementById('pause-overlay').classList.remove('open');
+      document.getElementById('pause-btn').textContent = '⏸️';
+      whiteTime = gameTime;
+      blackTime = gameTime;
+      currentMoveTime = moveTime;
+      mustCapture = getAllCaptures(board, currentPlayer);
+      updateTimerDisplay();
+      if (gameTime > 0 || moveTime > 0) startTimers();
+      render();
+    }
+
+    function render() {
+      const boardEl = document.getElementById('board');
+      boardEl.innerHTML = '';
+
+      for (let r = 0; r < SIZE; r++) {
+        for (let c = 0; c < SIZE; c++) {
+          const cell = document.createElement('div');
+          cell.className = 'cell ' + ((r + c) % 2 === 0 ? 'light' : 'dark');
+          
+          const isSel = (selected?.row === r && selected?.col === c) ||
+                        (chainCapture?.row === r && chainCapture?.col === c);
+          const isValidMove = validMoves.some(m => m.toRow === r && m.toCol === c);
+          
+          if (isSel) cell.classList.add('selected');
+          if (isValidMove) cell.classList.add('valid');
+
+          if (board[r][c]) {
+            const p = document.createElement('div');
+            p.className = 'piece ' + board[r][c].player;
+            if (isSel) p.classList.add('selected');
+            if (board[r][c].king) {
+              p.textContent = '♛';
+              p.style.color = board[r][c].player === 'white' ? '#000' : '#fff';
+            }
+            cell.appendChild(p);
+          } else if (isValidMove) {
+            const dot = document.createElement('div');
+            dot.className = 'valid-dot';
+            cell.appendChild(dot);
+          }
+
+          cell.onclick = () => handleClick(r, c);
+          boardEl.appendChild(cell);
+        }
+      }
+
+      document.getElementById('white-count').textContent = countPieces('white');
+      document.getElementById('black-count').textContent = countPieces('black');
+      
+      document.getElementById('white-player').classList.toggle('active', currentPlayer === 'white' && !winner);
+      document.getElementById('black-player').classList.toggle('active', currentPlayer === 'black' && !winner);
+
+      const msg = document.getElementById('message');
+      if (winner) {
+        msg.className = 'message winner';
+        msg.textContent = '🏆 Wygrywają ' + (winner === 'white' ? 'Gracz 1 (Białe)' : 'Gracz 2 (Czarne)') + '!';
+      } else if (chainCapture) {
+        msg.className = 'message capture';
+        msg.textContent = 'Kontynuuj bicie!';
+      } else if (forceCapture && mustCapture.length > 0) {
+        msg.className = 'message capture';
+        msg.textContent = 'Bicie obowiązkowe!';
+      } else {
+        msg.className = '';
+        msg.textContent = '';
+      }
+    }
+
+    resetGame();
+  </script>
+</body>
+</html>
