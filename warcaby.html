@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Warcaby">
+  <title>Polskie Warcaby</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { 
+      height: 100%; 
+      width: 100%;
+      overflow: hidden;
+      touch-action: manipulation;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #1e293b;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 6px;
+      padding-top: max(6px, env(safe-area-inset-top));
+      padding-bottom: max(6px, env(safe-area-inset-bottom));
+      gap: 8px;
+    }
+    .top-bar {
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 0 8px;
+      gap: 12px;
+      transform: rotate(180deg);
+    }
+    .bottom-bar {
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 0 8px;
+      gap: 12px;
+    }
+    .timer {
+      background: #1e293b;
+      border: 2px solid #475569;
+      color: #fff;
+      font-size: 20px;
+      font-weight: 700;
+      font-family: monospace;
+      padding: 8px 14px;
+      border-radius: 10px;
+      min-width: 70px;
+      text-align: center;
+    }
+    .timer.warning {
+      background: #dc2626;
+      border-color: #f87171;
+      animation: pulse 0.5s infinite;
+    }
+    .timer.paused {
+      opacity: 0.5;
+    }
+    .move-timer {
+      font-size: 14px;
+      font-weight: 600;
+      color: #fbbf24;
+      min-width: 40px;
+      text-align: center;
+    }
+    .move-timer.warning {
+      color: #ef4444;
+      animation: pulse 0.3s infinite;
+    }
+    .game-area {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .corner-panel {
+      position: fixed;
+      bottom: 80px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      opacity: 0.5;
+      transition: opacity 0.2s;
+    }
+    .corner-panel:hover {
+      opacity: 1;
+    }
+    .corner-panel.left {
+      left: 12px;
+    }
+    .corner-panel.right {
+      right: 12px;
+    }
+    .player {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 16px;
+      border-radius: 14px;
+      background: #334155;
+      font-weight: 700;
+      color: #fff;
+      font-size: 18px;
+      transition: all 0.2s ease;
+      border: 3px solid transparent;
+    }
+    .player.active {
+      background: #22c55e;
+      color: #000;
+      box-shadow: 0 0 25px rgba(34,197,94,0.5);
+      transform: scale(1.08);
+      border: 3px solid #fff;
+    }
+    .piece-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+    }
+    .piece-icon.white { background: #fff; border: 3px solid #ccc; }
+    .piece-icon.black { background: #1a1a1a; border: 3px solid #555; }
+    .legend {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      color: #94a3b8;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .legend .piece-icon {
+      width: 22px;
+      height: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+    }
+    .legend .piece-icon.white { color: #000; }
+    .legend .piece-icon.black { color: #fff; }
+    .legend .icons {
+      display: flex;
+      gap: 4px;
+    }
+    button {
+      padding: 8px 12px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #000;
+      background: #22c55e;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+    button:active { transform: scale(0.95); background: #16a34a; }
+    
+    /* Panel ustawień */
+    .settings-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.7);
+      justify-content: center;
+      align-items: center;
+      z-index: 100;
+    }
+    .settings-overlay.open {
+      display: flex;
+    }
+    .settings-panel {
+      background: #1e293b;
+      padding: 24px;
+      border-radius: 16px;
+      min-width: 280px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+    }
+    .settings-panel h2 {
+      color: #fff;
+      margin-bottom: 20px;
+      text-align: center;
+      font-size: 22px;
+    }
+    .setting-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      color: #cbd5e1;
+      font-size: 16px;
+    }
+    .setting-row input[type="checkbox"] {
+      width: 24px;
+      height: 24px;
+      accent-color: #22c55e;
+    }
+    .setting-row select {
+      padding: 8px 12px;
+      font-size: 16px;
+      border-radius: 8px;
+      border: none;
+      background: #334155;
+      color: #fff;
+    }
+    .setting-buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 20px;
+    }
+    .setting-buttons button {
+      width: 100%;
+      padding: 12px;
+      font-size: 16px;
+    }
+    .setting-buttons button.cancel {
+      background: #475569;
+    }
+    
+    .message {
+      padding: 10px 20px;
+      border-radius: 14px;
+      font-weight: 700;
+      font-size: 18px;
+      min-height: 20px;
+    }
+    .message.capture { background: #eab308; color: #000; }
+    .message.winner { background: #22c55e; color: #000; font-size: 22px; animation: pulse 1s infinite; }
+    @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+    .board-container {
+      background: #78350f;
+      padding: 6px;
+      border-radius: 10px;
+      box-shadow: 0 15px 40px rgba(0,0,0,0.5);
+    }
+    .board {
+      display: grid;
+      grid-template-columns: repeat(8, 1fr);
+    }
+    .cell {
+      width: min(11.5vw, 11.5vh);
+      height: min(11.5vw, 11.5vh);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+    .cell.light { background: #f3e5ab; }
+    .cell.dark { background: #8b5a2b; }
+    .cell.selected { box-shadow: inset 0 0 0 5px #facc15; }
+    .cell.valid { background: #4ade80 !important; }
+    .piece {
+      width: 88%;
+      height: 88%;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: min(7vw, 7vh);
+    }
+    .piece.white {
+      background: #ffffff;
+      border: 5px solid #d1d5db;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+    }
+    .piece.black {
+      background: #171717;
+      border: 5px solid #525252;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+    }
+    .piece.selected { transform: scale(1.08); }
+    .valid-dot {
+      width: 32%;
+      height: 32%;
+      border-radius: 50%;
+      background: #fff;
+      border: 3px solid #16a34a;
+      box-shadow: 0 0 12px rgba(34,197,94,0.6);
+    }
+  </style>
+</head>
+<body>
+  <div class="top-bar">
+    <div class="timer" id="black-timer">5:00</div>
+    <div class="player" id="black-player">
+      <div class="piece-icon black"></div>
+      <span>Gracz 2 (Czarne): <span id="black-count">8</span></span>
+    </div>
+    <div class="move-timer" id="black-move-timer"></div>
+  </div>
+  <div id="message"></div>
+  <div class="game-area">
+    <div class="board-container">
+      <div class="board" id="board"></div>
+    </div>
+  </div>
+  
+  <!-- Lewy dolny róg - ustawienia -->
+  <div class="corner-panel left">
+    <button onclick="openSettings()">⚙️</button>
+    <button onclick="resetGame()">Nowa</button>
+  </div>
+  
+  <!-- Prawy dolny róg - legenda -->
+  <div class="corner-panel right">
+    <div class="legend">
+      <span>Damka</span>
+      <div class="icons">
+        <div class="piece-icon white">♛</div>
+        <div class="piece-icon black">♛</div>
+      </div>
+    </div>
+  </div>
+  <div class="bottom-bar">
+    <div class="move-timer" id="white-move-timer"></div>
+    <div class="player" id="white-player">
+      <div class="piece-icon white"></div>
+      <span>Gracz 1 (Białe): <span id="white-count">8</span></span>
+    </div>
+    <div class="timer" id="white-timer">5:00</div>
+  </div>
+
+  <!-- Panel ustawień -->
+  <div class="settings-overlay" id="settings-overlay" onclick="closeSettings()">
+    <div class="settings-panel" onclick="event.stopPropagation()">
+      <h2>Ustawienia</h2>
+      
+      <div class="setting-row">
+        <label>Bicie obowiązkowe</label>
+        <input type="checkbox" id="force-capture" checked>
+      </div>
+      
+      <div class="setting-row">
+        <label>Czas na grę (min)</label>
+        <select id="game-time">
+          <option value="0">Bez limitu</option>
+          <option value="1">1</option>
+          <option value="3">3</option>
+          <option value="5" selected>5</option>
+          <option value="10">10</option>
+          <option value="15">15</option>
+        </select>
+      </div>
+      
+      <div class="setting-row">
+        <label>Czas na ruch (sek)</label>
+        <select id="move-time">
+          <option value="0">Bez limitu</option>
+          <option value="10">10</option>
+          <option value="20">20</option>
+          <option value="30">30</option>
+          <option value="60" selected>60</option>
+        </select>
+      </div>
+      
+      <div class="setting-buttons">
+        <button onclick="applySettings()">Zastosuj i restart</button>
+        <button onclick="closeSettings()" class="cancel">Anuluj</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const SIZE = 8;
+    let board, selected, currentPlayer, validMoves, mustCapture, winner, chainCapture;
+    let forceCapture = true;
+    
+    // Timer variables
+    let gameTime = 5 * 60; // 5 minut na gracza
+    let moveTime = 60; // 60 sekund na ruch
+    let whiteTime, blackTime, currentMoveTime;
+    let timerInterval = null;
+    let moveTimerInterval = null;
+
+    function openSettings() {
+      document.getElementById('settings-overlay').classList.add('open');
+      pauseTimers();
+    }
+    
+    function closeSettings() {
+      document.getElementById('settings-overlay').classList.remove('open');
+      if (!winner) resumeTimers();
+    }
+    
+    function applySettings() {
+      forceCapture = document.getElementById('force-capture').checked;
+      gameTime = parseInt(document.getElementById('game-time').value) * 60;
+      moveTime = parseInt(document.getElementById('move-time').value);
+      closeSettings();
+      resetGame();
+    }
+
+    function formatTime(seconds) {
+      if (seconds <= 0) return '0:00';
+      const m = Math.floor(seconds / 60);
+      const s = seconds % 60;
+      return m + ':' + (s < 10 ? '0' : '') + s;
+    }
+    
+    function updateTimerDisplay() {
+      const whiteEl = document.getElementById('white-timer');
+      const blackEl = document.getElementById('black-timer');
+      
+      whiteEl.textContent = formatTime(whiteTime);
+      blackEl.textContent = formatTime(blackTime);
+      
+      whiteEl.classList.toggle('warning', whiteTime <= 30 && whiteTime > 0);
+      blackEl.classList.toggle('warning', blackTime <= 30 && blackTime > 0);
+      whiteEl.classList.toggle('paused', currentPlayer !== 'white' || winner);
+      blackEl.classList.toggle('paused', currentPlayer !== 'black' || winner);
+      
+      // Move timer
+      const whiteMoveEl = document.getElementById('white-move-timer');
+      const blackMoveEl = document.getElementById('black-move-timer');
+      
+      if (moveTime > 0 && !winner) {
+        if (currentPlayer === 'white') {
+          whiteMoveEl.textContent = currentMoveTime + 's';
+          whiteMoveEl.classList.toggle('warning', currentMoveTime <= 5);
+          blackMoveEl.textContent = '';
+        } else {
+          blackMoveEl.textContent = currentMoveTime + 's';
+          blackMoveEl.classList.toggle('warning', currentMoveTime <= 5);
+          whiteMoveEl.textContent = '';
+        }
+      } else {
+        whiteMoveEl.textContent = '';
+        blackMoveEl.textContent = '';
+      }
+    }
+    
+    function startTimers() {
+      pauseTimers();
+      if (gameTime > 0) {
+        timerInterval = setInterval(() => {
+          if (winner) return;
+          if (currentPlayer === 'white') {
+            whiteTime--;
+            if (whiteTime <= 0) {
+              whiteTime = 0;
+              winner = 'black';
+              render();
+            }
+          } else {
+            blackTime--;
+            if (blackTime <= 0) {
+              blackTime = 0;
+              winner = 'white';
+              render();
+            }
+          }
+          updateTimerDisplay();
+        }, 1000);
+      }
+      startMoveTimer();
+    }
+    
+    function startMoveTimer() {
+      clearInterval(moveTimerInterval);
+      if (moveTime > 0) {
+        currentMoveTime = moveTime;
+        moveTimerInterval = setInterval(() => {
+          if (winner) return;
+          currentMoveTime--;
+          if (currentMoveTime <= 0) {
+            // Czas na ruch minął - zmiana gracza
+            currentMoveTime = moveTime;
+            currentPlayer = currentPlayer === 'white' ? 'black' : 'white';
+            selected = null;
+            validMoves = [];
+            chainCapture = null;
+            mustCapture = getAllCaptures(board, currentPlayer);
+            render();
+          }
+          updateTimerDisplay();
+        }, 1000);
+      }
+    }
+    
+    function pauseTimers() {
+      clearInterval(timerInterval);
+      clearInterval(moveTimerInterval);
+    }
+    
+    function resumeTimers() {
+      startTimers();
+    }
+
+    function toggleForceCapture() {
+      forceCapture = document.getElementById('force-capture').checked;
+      resetGame();
+    }
+
+    function init() {
+      board = Array(SIZE).fill(null).map(() => Array(SIZE).fill(null));
+      for (let r = 0; r < SIZE; r++) {
+        for (let c = 0; c < SIZE; c++) {
+          if ((r + c) % 2 === 1) {
+            if (r < 2) board[r][c] = { player: 'black', king: false };
+            else if (r > 5) board[r][c] = { player: 'white', king: false };
+          }
+        }
+      }
+      selected = null;
+      currentPlayer = 'white';
+      validMoves = [];
+      mustCapture = [];
+      winner = null;
+      chainCapture = null;
+    }
+
+    function isValid(r, c) { return r >= 0 && r < SIZE && c >= 0 && c < SIZE; }
+
+    function getCaptures(b, row, col, piece) {
+      const caps = [];
+      const dirs = [[-1,-1],[-1,1],[1,-1],[1,1]];
+      const opp = piece.player === 'white' ? 'black' : 'white';
+
+      if (piece.king) {
+        for (const [dr, dc] of dirs) {
+          let r = row + dr, c = col + dc;
+          while (isValid(r, c) && !b[r][c]) { r += dr; c += dc; }
+          if (isValid(r, c) && b[r][c]?.player === opp) {
+            const cr = r, cc = c;
+            r += dr; c += dc;
+            while (isValid(r, c) && !b[r][c]) {
+              caps.push({ toRow: r, toCol: c, capRow: cr, capCol: cc });
+              r += dr; c += dc;
+            }
+          }
+        }
+      } else {
+        for (const [dr, dc] of dirs) {
+          const mr = row + dr, mc = col + dc;
+          const tr = row + 2*dr, tc = col + 2*dc;
+          if (isValid(tr, tc) && b[mr][mc]?.player === opp && !b[tr][tc]) {
+            caps.push({ toRow: tr, toCol: tc, capRow: mr, capCol: mc });
+          }
+        }
+      }
+      return caps;
+    }
+
+    function getMoves(b, row, col, piece) {
+      const moves = [];
+      const dirs = piece.king ? [[-1,-1],[-1,1],[1,-1],[1,1]] :
+                   piece.player === 'white' ? [[-1,-1],[-1,1]] : [[1,-1],[1,1]];
+
+      if (piece.king) {
+        for (const [dr, dc] of dirs) {
+          let r = row + dr, c = col + dc;
+          while (isValid(r, c) && !b[r][c]) {
+            moves.push({ toRow: r, toCol: c });
+            r += dr; c += dc;
+          }
+        }
+      } else {
+        for (const [dr, dc] of dirs) {
+          const tr = row + dr, tc = col + dc;
+          if (isValid(tr, tc) && !b[tr][tc]) moves.push({ toRow: tr, toCol: tc });
+        }
+      }
+      return moves;
+    }
+
+    function getAllCaptures(b, player) {
+      const all = [];
+      for (let r = 0; r < SIZE; r++) {
+        for (let c = 0; c < SIZE; c++) {
+          if (b[r][c]?.player === player) {
+            const caps = getCaptures(b, r, c, b[r][c]);
+            if (caps.length > 0) all.push({ row: r, col: c, captures: caps });
+          }
+        }
+      }
+      return all;
+    }
+
+    function checkWinner(b, next) {
+      let hw = false, hb = false;
+      for (let r = 0; r < SIZE; r++) {
+        for (let c = 0; c < SIZE; c++) {
+          if (b[r][c]?.player === 'white') hw = true;
+          if (b[r][c]?.player === 'black') hb = true;
+        }
+      }
+      if (!hw) return 'black';
+      if (!hb) return 'white';
+
+      if (getAllCaptures(b, next).length > 0) return null;
+      for (let r = 0; r < SIZE; r++) {
+        for (let c = 0; c < SIZE; c++) {
+          if (b[r][c]?.player === next && getMoves(b, r, c, b[r][c]).length > 0) return null;
+        }
+      }
+      return next === 'white' ? 'black' : 'white';
+    }
+
+    function countPieces(player) {
+      let n = 0;
+      for (let r = 0; r < SIZE; r++)
+        for (let c = 0; c < SIZE; c++)
+          if (board[r][c]?.player === player) n++;
+      return n;
+    }
+
+    function handleClick(row, col) {
+      if (winner) return;
+
+      const piece = board[row][col];
+
+      if (chainCapture) {
+        if (row === chainCapture.row && col === chainCapture.col) return;
+        const move = validMoves.find(m => m.toRow === row && m.toCol === col);
+        if (move) executeMove(chainCapture.row, chainCapture.col, move);
+        return;
+      }
+
+      if (selected && selected.row === row && selected.col === col) {
+        selected = null;
+        validMoves = [];
+        render();
+        return;
+      }
+
+      if (selected) {
+        const move = validMoves.find(m => m.toRow === row && m.toCol === col);
+        if (move) { executeMove(selected.row, selected.col, move); return; }
+      }
+
+      if (piece && piece.player === currentPlayer) {
+        if (forceCapture && mustCapture.length > 0) {
+          const can = mustCapture.find(c => c.row === row && c.col === col);
+          if (!can) return;
+          selected = { row, col };
+          validMoves = can.captures;
+        } else {
+          const caps = getCaptures(board, row, col, piece);
+          validMoves = caps.length > 0 ? caps : getMoves(board, row, col, piece);
+          if (!forceCapture) {
+            const moves = getMoves(board, row, col, piece);
+            validMoves = [...caps, ...moves];
+          }
+          selected = { row, col };
+        }
+        render();
+      }
+    }
+
+    function executeMove(fromRow, fromCol, move) {
+      const piece = { ...board[fromRow][fromCol] };
+      board[fromRow][fromCol] = null;
+      board[move.toRow][move.toCol] = piece;
+
+      if ((piece.player === 'white' && move.toRow === 0) ||
+          (piece.player === 'black' && move.toRow === SIZE - 1)) {
+        piece.king = true;
+        board[move.toRow][move.toCol] = piece;
+      }
+
+      if (move.capRow !== undefined) {
+        board[move.capRow][move.capCol] = null;
+        if (forceCapture) {
+          const more = getCaptures(board, move.toRow, move.toCol, piece);
+          if (more.length > 0) {
+            selected = null;
+            validMoves = more;
+            chainCapture = { row: move.toRow, col: move.toCol };
+            render();
+            return;
+          }
+        }
+      }
+
+      const next = currentPlayer === 'white' ? 'black' : 'white';
+      currentPlayer = next;
+      mustCapture = getAllCaptures(board, next);
+      selected = null;
+      validMoves = [];
+      chainCapture = null;
+      winner = checkWinner(board, next);
+      if (winner) pauseTimers();
+      if (moveTime > 0 && !winner) {
+        currentMoveTime = moveTime;
+        startMoveTimer();
+      }
+      render();
+    }
+
+    function resetGame() {
+      init();
+      whiteTime = gameTime;
+      blackTime = gameTime;
+      currentMoveTime = moveTime;
+      mustCapture = getAllCaptures(board, currentPlayer);
+      updateTimerDisplay();
+      if (gameTime > 0 || moveTime > 0) startTimers();
+      render();
+    }
+
+    function render() {
+      const boardEl = document.getElementById('board');
+      boardEl.innerHTML = '';
+
+      for (let r = 0; r < SIZE; r++) {
+        for (let c = 0; c < SIZE; c++) {
+          const cell = document.createElement('div');
+          cell.className = 'cell ' + ((r + c) % 2 === 0 ? 'light' : 'dark');
+          
+          const isSel = (selected?.row === r && selected?.col === c) ||
+                        (chainCapture?.row === r && chainCapture?.col === c);
+          const isValidMove = validMoves.some(m => m.toRow === r && m.toCol === c);
+          
+          if (isSel) cell.classList.add('selected');
+          if (isValidMove) cell.classList.add('valid');
+
+          if (board[r][c]) {
+            const p = document.createElement('div');
+            p.className = 'piece ' + board[r][c].player;
+            if (isSel) p.classList.add('selected');
+            if (board[r][c].king) {
+              p.textContent = '♛';
+              p.style.color = board[r][c].player === 'white' ? '#000' : '#fff';
+            }
+            cell.appendChild(p);
+          } else if (isValidMove) {
+            const dot = document.createElement('div');
+            dot.className = 'valid-dot';
+            cell.appendChild(dot);
+          }
+
+          cell.onclick = () => handleClick(r, c);
+          boardEl.appendChild(cell);
+        }
+      }
+
+      document.getElementById('white-count').textContent = countPieces('white');
+      document.getElementById('black-count').textContent = countPieces('black');
+      
+      document.getElementById('white-player').classList.toggle('active', currentPlayer === 'white' && !winner);
+      document.getElementById('black-player').classList.toggle('active', currentPlayer === 'black' && !winner);
+
+      const msg = document.getElementById('message');
+      if (winner) {
+        msg.className = 'message winner';
+        msg.textContent = '🏆 Wygrywają ' + (winner === 'white' ? 'Gracz 1 (Białe)' : 'Gracz 2 (Czarne)') + '!';
+      } else if (chainCapture) {
+        msg.className = 'message capture';
+        msg.textContent = 'Kontynuuj bicie!';
+      } else if (forceCapture && mustCapture.length > 0) {
+        msg.className = 'message capture';
+        msg.textContent = 'Bicie obowiązkowe!';
+      } else {
+        msg.className = '';
+        msg.textContent = '';
+      }
+    }
+
+    resetGame();
+  </script>
+</body>
+</html>
