@@ -85,8 +85,8 @@
       bottom: 80px;
       display: flex;
       flex-direction: column;
-      gap: 8px;
-      opacity: 0.5;
+      gap: 12px;
+      opacity: 0.7;
       transition: opacity 0.2s;
     }
     .corner-panel:hover {
@@ -97,6 +97,23 @@
     }
     .corner-panel.right {
       right: 12px;
+      align-items: center;
+    }
+    .corner-panel button {
+      width: 50px;
+      height: 50px;
+      font-size: 24px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+    }
+    .version {
+      color: #64748b;
+      font-size: 10px;
+      font-weight: 600;
+      margin-top: 8px;
     }
     .player {
       display: flex;
@@ -160,8 +177,6 @@
       box-shadow: 0 2px 8px rgba(0,0,0,0.3);
     }
     button:active { transform: scale(0.95); background: #16a34a; }
-    
-    /* Panel ustawień */
     .settings-overlay {
       display: none;
       position: fixed;
@@ -179,34 +194,34 @@
     }
     .settings-panel {
       background: #1e293b;
-      padding: 24px;
-      border-radius: 16px;
-      min-width: 280px;
+      padding: 32px;
+      border-radius: 20px;
+      min-width: 340px;
       box-shadow: 0 20px 40px rgba(0,0,0,0.5);
     }
     .settings-panel h2 {
       color: #fff;
-      margin-bottom: 20px;
+      margin-bottom: 24px;
       text-align: center;
-      font-size: 22px;
+      font-size: 26px;
     }
     .setting-row {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 16px;
+      margin-bottom: 20px;
       color: #cbd5e1;
-      font-size: 16px;
+      font-size: 18px;
     }
     .setting-row input[type="checkbox"] {
-      width: 24px;
-      height: 24px;
+      width: 28px;
+      height: 28px;
       accent-color: #22c55e;
     }
     .setting-row select {
-      padding: 8px 12px;
-      font-size: 16px;
-      border-radius: 8px;
+      padding: 10px 16px;
+      font-size: 18px;
+      border-radius: 10px;
       border: none;
       background: #334155;
       color: #fff;
@@ -214,18 +229,43 @@
     .setting-buttons {
       display: flex;
       flex-direction: column;
-      gap: 10px;
-      margin-top: 20px;
+      gap: 12px;
+      margin-top: 28px;
     }
     .setting-buttons button {
       width: 100%;
-      padding: 12px;
-      font-size: 16px;
+      padding: 16px;
+      font-size: 18px;
     }
     .setting-buttons button.cancel {
       background: #475569;
     }
-    
+    .pause-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.8);
+      justify-content: center;
+      align-items: center;
+      z-index: 99;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .pause-overlay.open {
+      display: flex;
+    }
+    .pause-overlay h2 {
+      color: #fff;
+      font-size: 36px;
+    }
+    .pause-overlay button {
+      padding: 16px 48px;
+      font-size: 22px;
+      border-radius: 14px;
+    }
     .message {
       padding: 10px 20px;
       border-radius: 14px;
@@ -303,14 +343,11 @@
       <div class="board" id="board"></div>
     </div>
   </div>
-  
-  <!-- Lewy dolny róg - ustawienia -->
   <div class="corner-panel left">
+    <button onclick="togglePause()" id="pause-btn">⏸️</button>
     <button onclick="openSettings()">⚙️</button>
-    <button onclick="resetGame()">Nowa</button>
+    <button onclick="resetGame()">🔄</button>
   </div>
-  
-  <!-- Prawy dolny róg - legenda -->
   <div class="corner-panel right">
     <div class="legend">
       <span>Damka</span>
@@ -319,6 +356,7 @@
         <div class="piece-icon black">♛</div>
       </div>
     </div>
+    <div class="version">v1.2</div>
   </div>
   <div class="bottom-bar">
     <div class="move-timer" id="white-move-timer"></div>
@@ -328,17 +366,17 @@
     </div>
     <div class="timer" id="white-timer">5:00</div>
   </div>
-
-  <!-- Panel ustawień -->
+  <div class="pause-overlay" id="pause-overlay">
+    <h2>⏸️ PAUZA</h2>
+    <button onclick="togglePause()">▶️ Kontynuuj</button>
+  </div>
   <div class="settings-overlay" id="settings-overlay" onclick="closeSettings()">
     <div class="settings-panel" onclick="event.stopPropagation()">
       <h2>Ustawienia</h2>
-      
       <div class="setting-row">
         <label>Bicie obowiązkowe</label>
         <input type="checkbox" id="force-capture" checked>
       </div>
-      
       <div class="setting-row">
         <label>Czas na grę (min)</label>
         <select id="game-time">
@@ -350,7 +388,6 @@
           <option value="15">15</option>
         </select>
       </div>
-      
       <div class="setting-row">
         <label>Czas na ruch (sek)</label>
         <select id="move-time">
@@ -361,25 +398,34 @@
           <option value="60" selected>60</option>
         </select>
       </div>
-      
       <div class="setting-buttons">
         <button onclick="applySettings()">Zastosuj i restart</button>
         <button onclick="closeSettings()" class="cancel">Anuluj</button>
       </div>
     </div>
   </div>
-
   <script>
     const SIZE = 8;
     let board, selected, currentPlayer, validMoves, mustCapture, winner, chainCapture;
     let forceCapture = true;
-    
-    // Timer variables
-    let gameTime = 5 * 60; // 5 minut na gracza
-    let moveTime = 60; // 60 sekund na ruch
+    let gameTime = 5 * 60;
+    let moveTime = 60;
     let whiteTime, blackTime, currentMoveTime;
     let timerInterval = null;
     let moveTimerInterval = null;
+    let isPaused = false;
+
+    function togglePause() {
+      if (winner) return;
+      isPaused = !isPaused;
+      document.getElementById('pause-overlay').classList.toggle('open', isPaused);
+      document.getElementById('pause-btn').textContent = isPaused ? '▶️' : '⏸️';
+      if (isPaused) {
+        pauseTimers();
+      } else {
+        resumeTimers();
+      }
+    }
 
     function openSettings() {
       document.getElementById('settings-overlay').classList.add('open');
@@ -388,7 +434,7 @@
     
     function closeSettings() {
       document.getElementById('settings-overlay').classList.remove('open');
-      if (!winner) resumeTimers();
+      if (!winner && !isPaused) resumeTimers();
     }
     
     function applySettings() {
@@ -409,19 +455,14 @@
     function updateTimerDisplay() {
       const whiteEl = document.getElementById('white-timer');
       const blackEl = document.getElementById('black-timer');
-      
       whiteEl.textContent = formatTime(whiteTime);
       blackEl.textContent = formatTime(blackTime);
-      
       whiteEl.classList.toggle('warning', whiteTime <= 30 && whiteTime > 0);
       blackEl.classList.toggle('warning', blackTime <= 30 && blackTime > 0);
       whiteEl.classList.toggle('paused', currentPlayer !== 'white' || winner);
       blackEl.classList.toggle('paused', currentPlayer !== 'black' || winner);
-      
-      // Move timer
       const whiteMoveEl = document.getElementById('white-move-timer');
       const blackMoveEl = document.getElementById('black-move-timer');
-      
       if (moveTime > 0 && !winner) {
         if (currentPlayer === 'white') {
           whiteMoveEl.textContent = currentMoveTime + 's';
@@ -472,7 +513,6 @@
           if (winner) return;
           currentMoveTime--;
           if (currentMoveTime <= 0) {
-            // Czas na ruch minął - zmiana gracza
             currentMoveTime = moveTime;
             currentPlayer = currentPlayer === 'white' ? 'black' : 'white';
             selected = null;
@@ -493,11 +533,6 @@
     
     function resumeTimers() {
       startTimers();
-    }
-
-    function toggleForceCapture() {
-      forceCapture = document.getElementById('force-capture').checked;
-      resetGame();
     }
 
     function init() {
@@ -524,7 +559,6 @@
       const caps = [];
       const dirs = [[-1,-1],[-1,1],[1,-1],[1,1]];
       const opp = piece.player === 'white' ? 'black' : 'white';
-
       if (piece.king) {
         for (const [dr, dc] of dirs) {
           let r = row + dr, c = col + dc;
@@ -554,7 +588,6 @@
       const moves = [];
       const dirs = piece.king ? [[-1,-1],[-1,1],[1,-1],[1,1]] :
                    piece.player === 'white' ? [[-1,-1],[-1,1]] : [[1,-1],[1,1]];
-
       if (piece.king) {
         for (const [dr, dc] of dirs) {
           let r = row + dr, c = col + dc;
@@ -595,7 +628,6 @@
       }
       if (!hw) return 'black';
       if (!hb) return 'white';
-
       if (getAllCaptures(b, next).length > 0) return null;
       for (let r = 0; r < SIZE; r++) {
         for (let c = 0; c < SIZE; c++) {
@@ -614,29 +646,24 @@
     }
 
     function handleClick(row, col) {
-      if (winner) return;
-
+      if (winner || isPaused) return;
       const piece = board[row][col];
-
       if (chainCapture) {
         if (row === chainCapture.row && col === chainCapture.col) return;
         const move = validMoves.find(m => m.toRow === row && m.toCol === col);
         if (move) executeMove(chainCapture.row, chainCapture.col, move);
         return;
       }
-
       if (selected && selected.row === row && selected.col === col) {
         selected = null;
         validMoves = [];
         render();
         return;
       }
-
       if (selected) {
         const move = validMoves.find(m => m.toRow === row && m.toCol === col);
         if (move) { executeMove(selected.row, selected.col, move); return; }
       }
-
       if (piece && piece.player === currentPlayer) {
         if (forceCapture && mustCapture.length > 0) {
           const can = mustCapture.find(c => c.row === row && c.col === col);
@@ -660,13 +687,11 @@
       const piece = { ...board[fromRow][fromCol] };
       board[fromRow][fromCol] = null;
       board[move.toRow][move.toCol] = piece;
-
       if ((piece.player === 'white' && move.toRow === 0) ||
           (piece.player === 'black' && move.toRow === SIZE - 1)) {
         piece.king = true;
         board[move.toRow][move.toCol] = piece;
       }
-
       if (move.capRow !== undefined) {
         board[move.capRow][move.capCol] = null;
         if (forceCapture) {
@@ -680,7 +705,6 @@
           }
         }
       }
-
       const next = currentPlayer === 'white' ? 'black' : 'white';
       currentPlayer = next;
       mustCapture = getAllCaptures(board, next);
@@ -698,6 +722,9 @@
 
     function resetGame() {
       init();
+      isPaused = false;
+      document.getElementById('pause-overlay').classList.remove('open');
+      document.getElementById('pause-btn').textContent = '⏸️';
       whiteTime = gameTime;
       blackTime = gameTime;
       currentMoveTime = moveTime;
@@ -710,19 +737,15 @@
     function render() {
       const boardEl = document.getElementById('board');
       boardEl.innerHTML = '';
-
       for (let r = 0; r < SIZE; r++) {
         for (let c = 0; c < SIZE; c++) {
           const cell = document.createElement('div');
           cell.className = 'cell ' + ((r + c) % 2 === 0 ? 'light' : 'dark');
-          
           const isSel = (selected?.row === r && selected?.col === c) ||
                         (chainCapture?.row === r && chainCapture?.col === c);
           const isValidMove = validMoves.some(m => m.toRow === r && m.toCol === c);
-          
           if (isSel) cell.classList.add('selected');
           if (isValidMove) cell.classList.add('valid');
-
           if (board[r][c]) {
             const p = document.createElement('div');
             p.className = 'piece ' + board[r][c].player;
@@ -737,18 +760,14 @@
             dot.className = 'valid-dot';
             cell.appendChild(dot);
           }
-
           cell.onclick = () => handleClick(r, c);
           boardEl.appendChild(cell);
         }
       }
-
       document.getElementById('white-count').textContent = countPieces('white');
       document.getElementById('black-count').textContent = countPieces('black');
-      
       document.getElementById('white-player').classList.toggle('active', currentPlayer === 'white' && !winner);
       document.getElementById('black-player').classList.toggle('active', currentPlayer === 'black' && !winner);
-
       const msg = document.getElementById('message');
       if (winner) {
         msg.className = 'message winner';
